@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ hashFiles('member2_frontend/package.json') != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,6 +55,7 @@ jobs:
           path: member2_frontend/dist
 
   deploy:
+    if: ${{ needs.build.result == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
