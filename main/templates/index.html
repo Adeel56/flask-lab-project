@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flask Lab Project</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main>
+    <header class="app-header">
+      <h1>Team Chat</h1>
+      <div class="header-actions">
+        <button id="clear-chat-btn" class="icon-btn" title="Clear Chat">🗑️</button>
+        <button id="profile-btn" class="icon-btn" title="Profile">⚙️</button>
+        <button id="logout-btn" class="icon-btn" title="Logout">🚪</button>
+        <div class="theme-toggle">
+          <label class="switch">
+            <input id="themeSwitch" type="checkbox" />
+            <span class="slider round"></span>
+          </label>
+          <span id="themeLabel">Dark</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="chat">
+      <div class="messages" id="messages" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-message" name="message" type="text" maxlength="500" placeholder="Type a message..." />
+        <button type="submit">Send</button>
+      </form>
+      <div id="status" class="status"></div>
+    </section>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Profile Settings</h2>
+          <button class="close-btn" id="close-profile">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="profile-info">
+            <span id="current-avatar" class="large-avatar">🐶</span>
+            <h3 id="profile-name">User</h3>
+          </div>
+          
+          <div class="form-group">
+            <label>Choose Avatar</label>
+            <div id="avatar-grid-profile" class="avatar-grid"></div>
+          </div>
+          
+          <div class="form-group checkbox-group">
+            <label class="checkbox-label">
+              <input id="anonymous-toggle" type="checkbox" />
+              <span>Show as Anonymous in chat</span>
+            </label>
+          </div>
+          
+          <button id="save-profile-btn" class="btn-primary">Save Changes</button>
+          <div id="profile-status" class="status"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const messagesEl = document.getElementById('messages');
+      const statusEl = document.getElementById('status');
+      const profileModal = document.getElementById('profile-modal');
+      const profileStatusEl = document.getElementById('profile-status');
+      let lastId = null;
+      let currentProfile = null;
+
+      // Load profile
+      async function loadProfile() {
+        try {
+          const res = await fetch('/api/profile');
+          if (res.ok) {
+            currentProfile = await res.json();
+            document.getElementById('profile-name').textContent = currentProfile.name;
+            document.getElementById('current-avatar').textContent = currentProfile.avatar;
+            document.getElementById('anonymous-toggle').checked = Boolean(currentProfile.is_anonymous);
+          }
+        } catch {}
+      }
+
+      // Load avatars for profile modal
+      async function loadAvatarsForProfile() {
+        try {
+          const res = await fetch('/api/avatars');
+          const avatars = await res.json();
+          const grid = document.getElementById('avatar-grid-profile');
+          grid.innerHTML = '';
+          avatars.forEach(emoji => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'avatar-btn';
+            btn.textContent = emoji;
+            if (currentProfile && emoji === currentProfile.avatar) {
+              btn.classList.add('selected');
+            }
+            btn.addEventListener('click', () => {
+              document.querySelectorAll('#avatar-grid-profile .avatar-btn').forEach(b => b.classList.remove('selected'));
+              btn.classList.add('selected');
+            });
+            grid.appendChild(btn);
+          });
+        } catch {}
+      }
+
+      async function loadMessages() {
+        try {
+          const url = lastId ? `/api/messages?since_id=${lastId}` : '/api/messages';
+          const res = await fetch(url);
+          if (!res.ok) return;
+          const items = await res.json();
+          for (const item of items) {
+            const div = document.createElement('div');
+            div.className = 'msg';
+            const ts = new Date(item.created_at).toLocaleTimeString();
+            const avatar = item.avatar || '👤';
+            const displayName = item.display_name || 'User';
+            div.innerHTML = `<span class="msg-avatar">${avatar}</span><span class="msg-meta">${displayName} <span class="msg-time">${ts}</span></span><div class="msg-text">${item.message}</div>`;
+            messagesEl.appendChild(div);
+            lastId = item.id;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        } catch {}
+      }
+
+      document.getElementById('chat-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        statusEl.textContent = 'Sending...';
+        try {
+          const payload = {
+            message: document.getElementById('chat-message').value,
+          };
+          const res = await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            statusEl.textContent = err.error || 'Error sending message';
+          } else {
+            document.getElementById('chat-message').value = '';
+            statusEl.textContent = '';
+            await loadMessages();
+          }
+        } catch(err) {
+          statusEl.textContent = 'Network error';
+        }
+      });
+
+      // Profile modal
+      document.getElementById('profile-btn').addEventListener('click', () => {
+        loadAvatarsForProfile();
+        profileModal.style.display = 'flex';
+      });
+
+      document.getElementById('close-profile').addEventListener('click', () => {
+        profileModal.style.display = 'none';
+      });
+
+      document.getElementById('save-profile-btn').addEventListener('click', async () => {
+        profileStatusEl.textContent = 'Saving...';
+        try {
+          const selectedAvatar = document.querySelector('#avatar-grid-profile .avatar-btn.selected');
+          const payload = {
+            avatar: selectedAvatar ? selectedAvatar.textContent : currentProfile.avatar,
+            is_anonymous: document.getElementById('anonymous-toggle').checked
+          };
+          const res = await fetch('/api/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) {
+            profileStatusEl.textContent = 'Saved!';
+            await loadProfile();
+            setTimeout(() => { profileModal.style.display = 'none'; }, 1000);
+          } else {
+            profileStatusEl.textContent = 'Failed to save';
+          }
+        } catch {
+          profileStatusEl.textContent = 'Network error';
+        }
+      });
+
+      // Clear chat
+      document.getElementById('clear-chat-btn').addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to clear all messages? This cannot be undone.')) {
+          return;
+        }
+        try {
+          const res = await fetch('/api/messages', { method: 'DELETE' });
+          if (res.ok) {
+            messagesEl.innerHTML = '';
+            lastId = null;
+            statusEl.textContent = 'Chat cleared';
+            setTimeout(() => { statusEl.textContent = ''; }, 2000);
+          } else {
+            statusEl.textContent = 'Failed to clear chat';
+          }
+        } catch {
+          statusEl.textContent = 'Network error';
+        }
+      });
+
+      // Logout
+      document.getElementById('logout-btn').addEventListener('click', async () => {
+        try {
+          await fetch('/api/logout', { method: 'POST' });
+          window.location.href = '/login';
+        } catch {}
+      });
+
+      // Theme toggle
+      const switchEl = document.getElementById('themeSwitch');
+      const themeLabel = document.getElementById('themeLabel');
+      function applyTheme(dark) {
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        themeLabel.textContent = dark ? 'Dark' : 'Light';
+        localStorage.setItem('theme', dark ? 'dark' : 'light');
+      }
+      const savedTheme = localStorage.getItem('theme');
+      const dark = savedTheme ? (savedTheme === 'dark') : true;
+      switchEl.checked = dark;
+      applyTheme(dark);
+      switchEl.addEventListener('change', () => applyTheme(switchEl.checked));
+
+      // Initial and polling load
+      loadProfile();
+      loadMessages();
+      setInterval(loadMessages, 2000);
+    </script>
+  </main>
+</body>
+</html>

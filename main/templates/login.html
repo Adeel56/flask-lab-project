@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - Team Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="login-container">
+    <div class="login-card">
+      <h1>🚀 Team Chat</h1>
+      <p class="subtitle">Enter your name to join</p>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label for="name">Your Name *</label>
+          <input id="name" name="name" type="text" maxlength="50" placeholder="Enter your name" required autofocus />
+        </div>
+        
+        <div class="form-group">
+          <label for="avatar-select">Choose Avatar</label>
+          <div id="avatar-grid" class="avatar-grid"></div>
+          <input type="hidden" id="selected-avatar" value="🐶" />
+        </div>
+        
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input id="anonymous" type="checkbox" />
+            <span>Show as Anonymous in chat</span>
+          </label>
+        </div>
+        
+        <button type="submit" class="btn-primary">Join Chat</button>
+        <div id="login-status" class="status"></div>
+      </form>
+    </div>
+    
+    <script>
+      const statusEl = document.getElementById('login-status');
+      const avatarGridEl = document.getElementById('avatar-grid');
+      const selectedAvatarInput = document.getElementById('selected-avatar');
+      
+      // Load available avatars
+      fetch('/api/avatars')
+        .then(res => res.json())
+        .then(avatars => {
+          avatars.forEach((emoji, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'avatar-btn';
+            btn.textContent = emoji;
+            btn.dataset.avatar = emoji;
+            if (idx === 0) btn.classList.add('selected');
+            btn.addEventListener('click', () => {
+              document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+              btn.classList.add('selected');
+              selectedAvatarInput.value = emoji;
+            });
+            avatarGridEl.appendChild(btn);
+          });
+        });
+      
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        statusEl.textContent = 'Logging in...';
+        
+        try {
+          const payload = {
+            name: document.getElementById('name').value.trim(),
+            is_anonymous: document.getElementById('anonymous').checked,
+            avatar: selectedAvatarInput.value
+          };
+          
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!res.ok) {
+            const err = await res.json();
+            statusEl.textContent = err.error || 'Login failed';
+          } else {
+            window.location.href = '/';
+          }
+        } catch (err) {
+          statusEl.textContent = 'Network error';
+        }
+      });
+    </script>
+  </main>
+</body>
+</html>
