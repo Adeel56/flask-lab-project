@@ -1,10 +1,11 @@
 name: Vite Frontend - Build and Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [ "main", "frontend" ]
-    paths:
-      - 'member2_frontend/**'
+  # Disabled until frontend project is created
+  # push:
+  #   branches: [ "main", "frontend" ]
+  #   paths:
+  #     - 'member2_frontend/**'
   workflow_dispatch:
 
 permissions:
