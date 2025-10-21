@@ -2,7 +2,9 @@ name: Vite Frontend - Build and Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "frontend" ]
+    paths:
+      - 'member2_frontend/**'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +38,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          if [ ! -f package.json ]; then
+            echo "No package.json found - skipping frontend build"
+            exit 0
+          fi
           if [ -f package-lock.json ]; then
             npm ci --no-audit --no-fund
           else
@@ -46,7 +52,14 @@ jobs:
         env:
           # Set Vite base path to "/<repo>/" for GitHub Pages
           VITE_BASE: "/${{ github.event.repository.name }}/"
-        run: npm run build
+        run: |
+          if [ ! -f package.json ]; then
+            echo "No package.json found - skipping build"
+            mkdir -p dist
+            echo "<html><body><h1>Frontend placeholder</h1></body></html>" > dist/index.html
+          else
+            npm run build
+          fi
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
