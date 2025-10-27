@@ -1,0 +1,14 @@
+services:
+  web:
+    build: ./main
+    image: flask-lab-project:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DB_PATH=/app/data/app.db
+    volumes:
+      - ./main/data:/app/data
+    # Uncomment to auto-reload in dev with volume
+    # volumes:
+    #   - ./main:/app
